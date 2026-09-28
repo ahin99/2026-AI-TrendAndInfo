@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel>=0.41"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "study-quiz"
+version = "0.1.0"
+description = "Sync Notion study notes and generate session quizzes"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+study-quiz = "study_quiz.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

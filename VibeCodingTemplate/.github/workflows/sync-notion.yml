@@ -1,0 +1,53 @@
+name: Sync Notion
+
+on:
+  workflow_dispatch:
+    inputs:
+      session:
+        description: "동기화할 session 번호"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: study-quiz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install .
+      - name: Test
+        run: make test && make check
+      - name: Validate session path
+        env:
+          SESSION_INPUT: ${{ inputs.session }}
+        run: |
+          if [[ ! "$SESSION_INPUT" =~ ^[0-9]+$ ]] || (( 10#$SESSION_INPUT < 1 || 10#$SESSION_INPUT > 9999 )); then
+            echo "session must be an integer from 1 to 9999" >&2
+            exit 1
+          fi
+          printf -v SESSION_DIR 'session%02d' "$((10#$SESSION_INPUT))"
+          echo "SESSION_DIR=$SESSION_DIR" >> "$GITHUB_ENV"
+      - name: Sync Notion pages
+        run: python -m study_quiz sync --session "$SESSION_INPUT"
+        env:
+          SESSION_INPUT: ${{ inputs.session }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
+          NOTION_NAME_PROPERTY: ${{ vars.NOTION_NAME_PROPERTY || 'Name' }}
+          NOTION_SESSION_PROPERTY: ${{ vars.NOTION_SESSION_PROPERTY || 'Session' }}
+          NOTION_STATUS_PROPERTY: ${{ vars.NOTION_STATUS_PROPERTY || 'Status' }}
+          NOTION_PUBLISHED_VALUE: ${{ vars.NOTION_PUBLISHED_VALUE || 'Published' }}
+          NOTION_SESSION_VALUE_TEMPLATE: ${{ vars.NOTION_SESSION_VALUE_TEMPLATE || 'session{session:02d}' }}
+      - name: Commit synchronized pages
+        run: bash tools/commit_session.sh sync "$SESSION_DIR"

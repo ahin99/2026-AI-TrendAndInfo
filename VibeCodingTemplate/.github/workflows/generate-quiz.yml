@@ -1,0 +1,48 @@
+name: Generate Quiz
+
+on:
+  workflow_dispatch:
+    inputs:
+      session:
+        description: "퀴즈를 생성할 session 번호"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: study-quiz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install .
+      - name: Test
+        run: make test && make check
+      - name: Validate session path
+        env:
+          SESSION_INPUT: ${{ inputs.session }}
+        run: |
+          if [[ ! "$SESSION_INPUT" =~ ^[0-9]+$ ]] || (( 10#$SESSION_INPUT < 1 || 10#$SESSION_INPUT > 9999 )); then
+            echo "session must be an integer from 1 to 9999" >&2
+            exit 1
+          fi
+          printf -v SESSION_DIR 'session%02d' "$((10#$SESSION_INPUT))"
+          echo "SESSION_DIR=$SESSION_DIR" >> "$GITHUB_ENV"
+      - name: Generate quiz
+        env:
+          SESSION_INPUT: ${{ inputs.session }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || 'https://api.openai.com/v1' }}
+        run: python -m study_quiz generate --session "$SESSION_INPUT"
+      - name: Commit quiz
+        run: bash tools/commit_session.sh quiz "$SESSION_DIR"
