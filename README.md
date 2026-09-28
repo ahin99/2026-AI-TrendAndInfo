@@ -1,0 +1,1 @@
+# 2026-AI-TrendAndInfo 학습공동체
